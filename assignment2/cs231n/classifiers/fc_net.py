@@ -212,7 +212,15 @@ class FullyConnectedNet(object):
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-        pass
+        layers_dims = np.hstack([input_dim, hidden_dims, num_classes])
+        for i in range(self.num_layers):
+            self.params['W' + str(i + 1)] = weight_scale * np.random.randn(layers_dims[i], layers_dims[i + 1])
+            self.params['b' + str(i + 1)] = np.zeros(layers_dims[i + 1])
+            
+        if self.normalization:
+            for i in range(self.num_layers - 1):
+                self.params['gamma' + str(i + 1)] = np.ones(layer_dims[i + 1])
+                self.params['beta' + str(i + 1)] = np.zeros(layer_dims[i + 1])
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
@@ -273,9 +281,33 @@ class FullyConnectedNet(object):
         # layer, etc.                                                              #
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
-        pass
-
+        
+        caches = {}
+        
+        for i in range(self.num_layers - 1):
+            W = self.params['W' + str(i + 1)]
+            b = self.params['b' + str(i + 1)]
+            
+            gamma, beta, bn_param = None, None, None
+            if self.normalization:
+                gamma = self.params['gamma' + str(i + 1)]
+                beta = self.params['beta' + str(i + 1)]
+                bn_param = self.bn_params[i]
+            
+            dropout_param = None
+            if self.use_dropout:
+                dropout_param = self.dropout_param
+                
+            X, cache = affine_norm_relu_dropout_forward(X, W, b, 
+                                                        self.normalization, gamma, beta, bn_param, 
+                                                        self.use_dropout, dropout_param)
+            caches[i + 1] = cache
+                
+        W = self.params['W' + str(self.num_layers)]
+        b = self.params['b' + str(self.num_layers)]
+        scores, cache = affine_forward(X, W, b)
+        caches[self.num_layers] = cache
+            
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
         #                             END OF YOUR CODE                             #
@@ -300,8 +332,30 @@ class FullyConnectedNet(object):
         # of 0.5 to simplify the expression for the gradient.                      #
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
-        pass
+        
+        # Compute the loss
+        loss, dscores = softmax_loss(scores, y)
+        
+        for i in range(self.num_layers):
+            W = self.params['W' + str(i + 1)]
+            loss += 0.5 * self.reg * np.sum(W * W) 
+        
+        # Backward pass: compute gradients
+        dout, dW, db = affine_backward(dscores, caches[self.num_layers])
+        grads['W' + str(self.num_layers)] = dW + self.reg * self.params['W' + str(self.num_layers)]
+        grads['b' + str(self.num_layers)] = db
+        
+        for i in range(self.num_layers - 1, 0, -1):
+            dout, dW, db, dgamma, dbeta = affine_norm_relu_dropout_backward(dout, caches[i], 
+                                                                            self.normalization, 
+                                                                            self.use_dropout)
+            
+            if self.normalization:
+                grads['gamma' + str(i)] = dgamma
+                grads['beta'  + str(i)] = dbeta
+                
+            grads['W' + str(i)] = dW + self.reg * self.params['W' + str(i)]
+            grads['b' + str(i)] = db
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
@@ -309,3 +363,40 @@ class FullyConnectedNet(object):
         ############################################################################
 
         return loss, grads
+
+def affine_norm_relu_dropout_forward(x, w, b, 
+                                     normalization = None, gamma = None, beta = None, bn_param = None, 
+                                     dropout = None, dropout_param = None):
+    out, fc_cache = affine_forward(x, w, b)
+    
+    bn_cache = None
+    if normalization == 'batchnorm':
+        out, bn_cache = batchnorm_forward(out, gamma, beta, bn_param)
+    elif normalization == 'layernorm':
+        out, bn_cache = layernorm_forward(out, gamma, beta, bn_param) 
+        
+    out, relu_cache = relu_forward(out)
+    
+    do_cache = None
+    if dropout:
+        out, do_cache = dropout_forward(x, self.dropout_param)
+        
+    return out, (fc_cache, bn_cache, relu_cache, do_cache)
+    
+def affine_norm_relu_dropout_backward(dout, cache, normalization = None, dropout = None):
+    fc_cache, bn_cache, relu_cache, do_cache = cache
+    
+    if dropout:
+        dout = dropout_backward(dout, do_cache)
+    
+    dout = relu_backward(dout, relu_cache)
+    
+    dgamma, dbeta = None, None
+    if normalization == 'batchnorm':
+        dout, dgamma, dbeta = batchnorm_backward(dout, bn_cache)
+    elif normalization == 'layernorm':
+        dout, dgamma, dbeta = layernorm_backward(dout, bn_cache)
+    
+    dx, dw, db = affine_backward(dout, fc_cache)
+    return dx, dw, db, dgamma, dbeta
+    
