@@ -212,10 +212,10 @@ class FullyConnectedNet(object):
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-        layers_dims = np.hstack([input_dim, hidden_dims, num_classes])
+        layer_dims = np.hstack([input_dim, hidden_dims, num_classes])
         for i in range(self.num_layers):
-            self.params['W' + str(i + 1)] = weight_scale * np.random.randn(layers_dims[i], layers_dims[i + 1])
-            self.params['b' + str(i + 1)] = np.zeros(layers_dims[i + 1])
+            self.params['W' + str(i + 1)] = weight_scale * np.random.randn(layer_dims[i], layer_dims[i + 1])
+            self.params['b' + str(i + 1)] = np.zeros(layer_dims[i + 1])
             
         if self.normalization:
             for i in range(self.num_layers - 1):

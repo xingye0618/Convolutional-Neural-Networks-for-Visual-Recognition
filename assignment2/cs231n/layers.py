@@ -280,7 +280,7 @@ def batchnorm_backward(dout, cache):
     mean, var, std = cache['mean'], cache['var'], cache['std']
     x_squared, x_sum_squared = cache['x_squared'], cache['x_sum_squared']
     x_centralized, x_normalized = cache['x_centralized'], cache['x_normalized']
-        
+    
     dgamma = np.sum(dout * x_normalized, axis=0)                           #(8)
     dbeta = np.sum(dout, axis=0)                                           #(8)
     dx_normalized = dout * gamma                                           #(8)
@@ -327,7 +327,20 @@ def batchnorm_backward_alt(dout, cache):
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
+    N, D = dout.shape
+    
+    gamma, beta, eps = cache['gamma'], cache['beta'], cache['eps']
+    mean, var, std = cache['mean'], cache['var'], cache['std']
+    x_squared, x_sum_squared = cache['x_squared'], cache['x_sum_squared']
+    x_centralized, x_normalized = cache['x_centralized'], cache['x_normalized']
+    
+    dgamma = np.sum(dout * x_normalized, axis=0)
+    dbeta = np.sum(dout, axis=0)
+    
+    dterm1 = dout * N
+    dterm2 = - np.sum(dout, axis=0)
+    dterm3 = - x_normalized * np.sum(dout * x_normalized, axis=0)
+    dx = gamma / std * (dterm1 + dterm2 + dterm3) / N
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
