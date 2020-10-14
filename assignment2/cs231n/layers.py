@@ -201,7 +201,22 @@ def batchnorm_forward(x, gamma, beta, bn_param):
         #######################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-        pass
+        mean = np.mean(x, axis=0)                                          #(1)
+        x_centralized = x - mean                                           #(2)
+        x_squared = x_centralized ** 2                                     #(3)
+        x_sum_squared = np.sum(x_squared, axis=0)                          #(4)
+        var = x_sum_squared / N                                            #(5)
+        std = np.sqrt(var + eps)                                           #(6)
+        x_normalized = x_centralized / std                                 #(7)
+        out = gamma * x_normalized + beta                                  #(8)
+        
+        running_mean = momentum * running_mean + (1 - momentum) * mean
+        running_var = momentum * running_var + (1 - momentum) * var
+        
+        cache = {'gamma': gamma, 'beta': beta, 'eps': eps,
+                 'mean': mean, 'var': var, 'std': std,
+                 'x_squared': x_squared, 'x_sum_squared': x_sum_squared,
+                 'x_centralized': x_centralized, 'x_normalized': x_normalized}
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         #######################################################################
@@ -216,7 +231,8 @@ def batchnorm_forward(x, gamma, beta, bn_param):
         #######################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-        pass
+        x_normlized = (x - running_mean) / np.sqrt(running_var + eps)
+        out = gamma * x_normlized + beta
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         #######################################################################
@@ -257,9 +273,27 @@ def batchnorm_backward(dout, cache):
     # might prove to be helpful.                                              #
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
-    pass
-
+    
+    N, D = dout.shape
+    
+    gamma, beta, eps = cache['gamma'], cache['beta'], cache['eps']
+    mean, var, std = cache['mean'], cache['var'], cache['std']
+    x_squared, x_sum_squared = cache['x_squared'], cache['x_sum_squared']
+    x_centralized, x_normalized = cache['x_centralized'], cache['x_normalized']
+        
+    dgamma = np.sum(dout * x_normalized, axis=0)                           #(8)
+    dbeta = np.sum(dout, axis=0)                                           #(8)
+    dx_normalized = dout * gamma                                           #(8)
+    dx_centralized = dx_normalized / std                                   #(7)
+    dstd = - np.sum(dx_normalized * x_centralized, axis=0) / std ** 2      #(7)
+    dvar = dstd / (2 * np.sqrt(var + eps))                                 #(6)
+    dx_sum_squared = dvar / N                                              #(5)
+    dx_squared = dx_sum_squared * np.ones((N, D))                          #(4)
+    dx_centralized += 2 * x_centralized * dx_squared                       #(3)
+    dx = dx_centralized                                                    #(2)
+    dmean = - np.sum(dx_centralized, axis=0)                               #(2)
+    dx += np.ones((N, D)) / N * dmean                                      #(1)
+    
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
     #                             END OF YOUR CODE                            #
