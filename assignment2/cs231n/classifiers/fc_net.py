@@ -297,12 +297,12 @@ class FullyConnectedNet(object):
             dropout_param = None
             if self.use_dropout:
                 dropout_param = self.dropout_param
-                
+            
             X, cache = affine_norm_relu_dropout_forward(X, W, b, 
                                                         self.normalization, gamma, beta, bn_param, 
                                                         self.use_dropout, dropout_param)
             caches[i + 1] = cache
-                
+            
         W = self.params['W' + str(self.num_layers)]
         b = self.params['b' + str(self.num_layers)]
         scores, cache = affine_forward(X, W, b)
@@ -379,7 +379,7 @@ def affine_norm_relu_dropout_forward(x, w, b,
     
     do_cache = None
     if dropout:
-        out, do_cache = dropout_forward(x, self.dropout_param)
+        out, do_cache = dropout_forward(out, dropout_param)
         
     return out, (fc_cache, bn_cache, relu_cache, do_cache)
     
