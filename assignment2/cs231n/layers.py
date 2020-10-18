@@ -820,7 +820,10 @@ def spatial_batchnorm_forward(x, gamma, beta, bn_param):
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
+    N, C, H, W = x.shape
+    x = x.transpose(0, 2, 3, 1).reshape(-1, C)
+    out, cache = batchnorm_forward(x, gamma, beta, bn_param)
+    out = out.reshape(N, H, W, C).transpose(0, 3, 1, 2)
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
@@ -854,7 +857,10 @@ def spatial_batchnorm_backward(dout, cache):
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
+    N, C, H, W = dout.shape
+    dout = dout.transpose(0, 2, 3, 1).reshape(-1, C)
+    dx, dgamma, dbeta = batchnorm_backward_alt(dout, cache)
+    dx = dx.reshape(N, H, W, C).transpose(0, 3, 1, 2)    
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
@@ -893,8 +899,27 @@ def spatial_groupnorm_forward(x, gamma, beta, G, gn_param):
     # and layer normalization!                                                #
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
-    pass
+    
+    N, C, H, W = x.shape
+    x = x.reshape((N * G, -1))
+    
+    mean = np.mean(x, axis=1, keepdims=True)                               #(1)
+    x_centralized = x - mean                                               #(2)
+    x_squared = x_centralized ** 2                                         #(3)
+    x_sum_squared = np.sum(x_squared, axis=1, keepdims=True)               #(4)
+    var = x_sum_squared / (C // G * H * W)                                 #(5)
+    std = np.sqrt(var + eps)                                               #(6)
+    x_normalized = x_centralized / std                                     #(7)
+    
+    x_normalized = x_normalized.reshape(N, C, H, W)
+    
+    out = gamma * x_normalized + beta                                      #(8)
+    
+    cache = {'G': G,
+             'gamma': gamma, 'beta': beta, 'eps': eps,
+             'mean': mean, 'var': var, 'std': std,
+             'x_squared': x_squared, 'x_sum_squared': x_sum_squared,
+             'x_centralized': x_centralized, 'x_normalized': x_normalized}
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
@@ -924,7 +949,34 @@ def spatial_groupnorm_backward(dout, cache):
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
+    N, C, H, W = dout.shape
+    
+    G = cache['G']
+    gamma, beta, eps = cache['gamma'], cache['beta'], cache['eps']
+    mean, var, std = cache['mean'], cache['var'], cache['std']
+    x_squared, x_sum_squared = cache['x_squared'], cache['x_sum_squared']
+    x_centralized, x_normalized = cache['x_centralized'], cache['x_normalized']
+    
+    size = (N * G, C // G * H * W)
+    
+    dgamma = np.sum(dout * x_normalized, axis=(0, 2, 3), keepdims=True)    #(8)
+    dbeta = np.sum(dout, axis=(0, 2, 3), keepdims=True)                    #(8)
+    dx_normalized = dout * gamma                                           #(8)
+    
+    dx_normalized = dx_normalized.reshape(size)
+    
+    dx_centralized = dx_normalized / std                                   #(7)
+    dstd = - np.sum(dx_normalized * x_centralized, 
+                    axis=1, keepdims=True) / std ** 2                      #(7)
+    dvar = dstd / (2 * np.sqrt(var + eps))                                 #(6)
+    dx_sum_squared = dvar / size[1]                                        #(5)
+    dx_squared = dx_sum_squared * np.ones(size)                            #(4)
+    dx_centralized += 2 * x_centralized * dx_squared                       #(3)
+    dx = dx_centralized                                                    #(2)
+    dmean = - np.sum(dx_centralized, axis=1, keepdims=True)                #(2)
+    dx += np.ones(size) / size[1] * dmean                                  #(1)
+    
+    dx = dx.reshape(N, C, H, W)
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
