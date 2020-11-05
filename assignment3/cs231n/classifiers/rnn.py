@@ -151,7 +151,30 @@ class CaptioningRNN(object):
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-        pass
+        h0, affine_cache = affine_forward(features, W_proj, b_proj)            # (1)
+        x, embed_cache = word_embedding_forward(captions_in, W_embed)          # (2)
+        
+        if self.cell_type == 'rnn':
+            h, cell_cache = rnn_forward(x, h0, Wx, Wh, b)                      # (3) - RNN
+        else:
+            h, cell_cache = lstm_forward(x, h0, Wx, Wh, b)                     # (3) - LSTM
+        
+        scores, scores_cache = temporal_affine_forward(h, W_vocab, b_vocab)    # (4)
+        loss, dout = temporal_softmax_loss(scores, captions_out, mask)         # (5)
+        dh, dW_vocab, db_vocab = temporal_affine_backward(dout, scores_cache)  # (4)
+        
+        if self.cell_type == 'rnn':
+            dx, dh0, dWx, dWh, db = rnn_backward(dh, cell_cache)               # (3) - RNN
+        else:
+            dx, dh0, dWx, dWh, db = lstm_backward(dh, cell_cache)              # (3) - LSTM
+            
+        dW_embed = word_embedding_backward(dx, embed_cache)                    # (2)
+        dfeatures, dW_proj, db_proj = affine_backward(dh0, affine_cache)       # (1)
+        
+        grads = {'W_proj': dW_proj, 'b_proj': db_proj,
+                 'W_embed': dW_embed,
+                 'Wx': dWx, 'Wh': dWh, 'b': db, 
+                 'W_vocab': dW_vocab, 'b_vocab': db_vocab}
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
