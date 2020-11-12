@@ -250,7 +250,7 @@ class CaptioningRNN(object):
             if self.cell_type == 'rnn':
                 h, _ = rnn_step_forward(x, h, Wx, Wh, b)
             else:
-                h, c, _ = lstm_step_forward(x, c, h, Wx, Wh, b)
+                h, c, _ = lstm_step_forward(x, h, c, Wx, Wh, b)
             scores, _ = affine_forward(h, W_vocab, b_vocab)
             captions[:, i] = np.argmax(scores, axis=-1)
             word = np.argmax(scores, axis=-1)
