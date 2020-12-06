@@ -34,8 +34,17 @@ def compute_saliency_maps(X, y, model):
     # 4) Finally, process the returned gradient to compute the saliency map.      #
     ###############################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
-    pass
+    
+    X = tf.Variable(X, dtype='float32')
+    y = tf.Variable(y, dtype='int32')
+    
+    with tf.GradientTape() as tape:
+        tape.watch(X)
+        scores = model(X)
+        correct_scores = tf.gather_nd(scores, tf.stack((tf.range(X.shape[0]), y), axis=1))
+        
+    dx = tape.gradient(correct_scores, X)
+    saliency = np.max(np.abs(dx), axis=3)
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ##############################################################################
@@ -67,7 +76,7 @@ def make_fooling_image(X, target_y, model):
     ##############################################################################
     # TODO: Generate a fooling image X_fooling that the model will classify as   #
     # the class target_y. Use gradient *ascent* on the target class score, using #
-    # the model.scores Tensor to get the class scores for the model.image.   #
+    # the model.scores Tensor to get the class scores for the model.image.       #
     # When computing an update step, first normalize the gradient:               #
     #   dX = learning_rate * g / ||g||_2                                         #
     #                                                                            #
@@ -84,7 +93,22 @@ def make_fooling_image(X, target_y, model):
     ##############################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
+    MAX_ITER = 100
+    X_fooling = tf.Variable(X_fooling)
+    
+    for i in range(MAX_ITER):
+        with tf.GradientTape() as tape:
+            tape.watch(X_fooling)
+            scores = model(X_fooling)
+            target_score = scores[:, target_y]
+            
+        if tf.math.argmax(scores, axis=1) == target_y:
+            # print('Successfully generate a fooling image!')
+            break
+
+        grads = tape.gradient(target_score, X_fooling)
+        dX = learning_rate * grads / tf.norm(grads, ord=2)
+        X_fooling = X_fooling + dX
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ##############################################################################
@@ -103,7 +127,17 @@ def class_visualization_update_step(X, model, target_y, l2_reg, learning_rate):
     ########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
+    X = tf.Variable(X)
+    
+    with tf.GradientTape() as tape:
+        tape.watch(X)
+        scores = model(X)
+        
+        target_score = scores[:, target_y]
+        loss = target_score - l2_reg * tf.square(tf.norm(X, ord=2))
+        
+    grads = tape.gradient(loss, X)
+    X = X + learning_rate * grads
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ############################################################################
